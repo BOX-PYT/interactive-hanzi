@@ -31,14 +31,23 @@ class CharSlot {
   }
 
   _fetchChar() {
-    const url = `https://cdn.jsdelivr.net/npm/hanzi-writer-data@2.0/${encodeURIComponent(this.ch)}.json`;
+    const char = this.ch;
+    const base = 'https://cdn.jsdelivr.net/npm/hanzi-writer-data@2';
+    const url  = `${base}/${encodeURIComponent(char)}.json`;
     const { cx, cy, sz } = this;
     fetch(url)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(r.status);
+        return r.json();
+      })
       .then(data => {
         this.strokes = data.medians.map(m => new Stroke(m, cx, cy, sz));
+        this.loadError = false;
       })
-      .catch(() => console.warn('CDN fetch failed for', this.ch));
+      .catch(() => {
+        console.warn('字符不在数据集中:', char);
+        this.loadError = true;
+      });
   }
 
   applyPush(mx, my, dx, dy) {
