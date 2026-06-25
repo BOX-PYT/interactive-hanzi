@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>互动汉字</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; cursor: none; }
+    canvas { display: block; }
+
+    /* Edit button */
+    #edit-btn {
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 100;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13px;
+      padding: 5px 10px;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: background 0.2s;
+    }
+    #edit-btn:hover { background: rgba(255,255,255,0.22); }
+
+    /* Modal overlay */
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0,0,0,0.75);
+      align-items: center;
+      justify-content: center;
+    }
+    #modal.open { display: flex; }
+
+    #modal-box {
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      padding: 28px 32px;
+      width: min(320px, 88vw);
+      color: #fff;
+    }
+    #modal-box h2 {
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      letter-spacing: 0.05em;
+    }
+    #modal-box p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      margin-bottom: 20px;
+    }
+
+    .char-inputs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .char-inputs input {
+      flex: 1;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 28px;
+      text-align: center;
+      padding: 10px 4px;
+      outline: none;
+      width: 0;
+    }
+    .char-inputs input:focus {
+      border-color: rgba(255,255,255,0.6);
+      background: rgba(255,255,255,0.12);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .modal-actions button {
+      border-radius: 7px;
+      font-size: 13px;
+      padding: 7px 18px;
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    #btn-cancel { background: transparent; color: rgba(255,255,255,0.5); }
+    #btn-confirm {
+      background: rgba(255,255,255,0.9);
+      color: #000;
+      font-weight: 600;
+      border-color: transparent;
+    }
+    #btn-confirm:hover { background: #fff; }
+  </style>
+</head>
+<body>
+  <!-- Edit button -->
+  <button id="edit-btn" onclick="openModal()">改字</button>
+
+  <!-- Modal -->
+  <div id="modal">
+    <div id="modal-box">
+      <h2>修改显示的字</h2>
+      <p>每格输入一个汉字，共三个</p>
+      <div class="char-inputs">
+        <input id="c1" placeholder="字" />
+        <input id="c2" placeholder="字" />
+        <input id="c3" placeholder="字" />
+      </div>
+      <div class="modal-actions">
+        <button id="btn-cancel" onclick="closeModal()">取消</button>
+        <button id="btn-confirm" onclick="confirmChars()">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.min.js"></script>
+  <script src="src/BoundPoint.js"></script>
+  <script src="src/Stroke.js"></script>
+  <script src="src/Cursor.js"></script>
+  <script src="src/sketch.js"></script>
+
+  <script>
+    // Auto-advance: use compositionend for IME (pinyin), input for direct keyboards
+    ['c1','c2','c3'].forEach((id, i, arr) => {
+      const el = document.getElementById(id);
+
+      function advance() {
+        // Keep only the first character committed
+        if (el.value.length > 1) el.value = el.value.trim().slice(0, 1);
+        if (el.value.length === 1 && i < arr.length - 1) {
+          document.getElementById(arr[i + 1]).focus();
+        }
+      }
+
+      el.addEventListener('compositionend', advance);          // IME (pinyin, wubi…)
+      el.addEventListener('input', function(e) {
+        if (!e.isComposing) advance();                         // direct input only
+      });
+    });
+
+    function openModal() {
+      const chars = typeof DISPLAY_CHARS !== 'undefined' ? DISPLAY_CHARS : ['','',''];
+      document.getElementById('c1').value = chars[0] || '';
+      document.getElementById('c2').value = chars[1] || '';
+      document.getElementById('c3').value = chars[2] || '';
+      document.getElementById('modal').classList.add('open');
+      document.getElementById('c1').focus();
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+    }
+
+    function confirmChars() {
+      const c1 = document.getElementById('c1').value.trim().slice(0, 1);
+      const c2 = document.getElementById('c2').value.trim().slice(0, 1);
+      const c3 = document.getElementById('c3').value.trim().slice(0, 1);
+      if (!c1 || !c2 || !c3) {
+        alert('请输入三个汉字');
+        return;
+      }
+      closeModal();
+      if (typeof updateChars === 'function') updateChars(c1, c2, c3);
+    }
+
+    // Close on backdrop click
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    // Enter key confirms
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && document.getElementById('modal').classList.contains('open')) {
+        confirmChars();
+      }
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>
